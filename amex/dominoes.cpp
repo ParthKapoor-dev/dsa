@@ -1,65 +1,92 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <set>
+#include <algorithm>
+#include <utility>
+
 using namespace std;
 
-// NOT WORKING FOR NOW
+// Helper to create a canonical pair (sorted)
+pair<int, int> make_sorted_pair(int a, int b) {
+    if (a > b) swap(a, b);
+    return {a, b};
+}
 
-bool Solution(vector<int>& arr){
+// Helper to check if the input dominoes match a required configuration
+bool check(const multiset<pair<int, int>>& input_dominoes,
+           int c1, int c2, int x, int y, int a, int b) {
+    
+    multiset<pair<int, int>> required_dominoes;
+    required_dominoes.insert(make_sorted_pair(c1, c2));
+    required_dominoes.insert(make_sorted_pair(c1, c2));
+    required_dominoes.insert(make_sorted_pair(c1, x));
+    required_dominoes.insert(make_sorted_pair(c2, y));
+    required_dominoes.insert(make_sorted_pair(x, a));
+    required_dominoes.insert(make_sorted_pair(y, b));
 
-    vector<pair<int,int>> doms;
-    bool flag = true;
+    return input_dominoes == required_dominoes;
+}
 
-    int i = 0;
-    while(i < 12){
-        doms.push_back({arr[i++], arr[i++]});
+bool Solution(vector<int>& arr) {
+    // 1. Count frequencies of each number
+    unordered_map<int, int> counts;
+    for (int val : arr) {
+        counts[val]++;
     }
 
-    // counting repetitions
-    unordered_map<int,pair<int,vector<int>>> m;
-
-    for(int i = 0; i < 12; i++){
-        m[arr[i]].first++; //
-        m[arr[i]].second.push_back(i);
-    }
-
-    vector<vector<int>> centers;
-
-    for(auto x:m){
-        if(x.second.first >= 3){
-           centers.push_back(x.second.second);
-           x.second.first = x.second.first - 3;
+    // 2. Group numbers by their frequency
+    vector<int> threes, twos, ones;
+    for (auto const& [val, count] : counts) {
+        if (count == 3) {
+            threes.push_back(val);
+        } else if (count == 2) {
+            twos.push_back(val);
+        } else if (count == 1) {
+            ones.push_back(val);
+        } else {
+            // Any other frequency means it's impossible
+            return false;
         }
     }
 
-    if(centers.size() < 2) return false;
-
-    for(auto x:centers){
-        for(auto y:x){
-            arr[y] = -1;
-        }
+    // 3. A valid pyramid structure requires exactly two numbers of each frequency group (3, 2, 1)
+    if (threes.size() != 2 || twos.size() != 2 || ones.size() != 2) {
+        return false;
     }
 
-    for(int i = 0; i < centers[0].size(); i++){
-        int y = centers[0][i] % 2 == 0 ? centers[0][i] + 1: centers[0][i] - 1;
-
-        for(int j = 0; j < centers[1].size(); j++){
-            if(y == centers[1][j]){
-                centers[1].erase( centers[1].begin() + j);
-                centers[0].erase(centers[0].begin() + i);
-                break;
-            }
-        }
+    // 4. Create a multiset of the input dominoes for easy comparison.
+    // We use sorted pairs to treat (a,b) and (b,a) as the same domino.
+    multiset<pair<int, int>> input_dominoes;
+    for (size_t i = 0; i < arr.size(); i += 2) {
+        input_dominoes.insert(make_sorted_pair(arr[i], arr[i + 1]));
     }
 
-    for(auto x:centers){
-        if(m[arr[x[0]]].first >= 2){
-           m[arr[x[0]]].first =  m[arr[x[0]]].first - 2;
-        }else flag = false;
-    }
+    // 5. Define the groups of numbers based on frequency.
+    // c1, c2 are the central "spine" numbers.
+    int c1 = threes[0], c2 = threes[1];
+    // x1, x2 are the intermediate link numbers.
+    int x1 = twos[0], x2 = twos[1];
+    // o1, o2 are the outer "leaf" numbers.
+    int o1 = ones[0], o2 = ones[1];
 
-    return flag;
-};
+    // 6. Check all valid permutations of pairings against the input dominoes.
+    // The spine is fixed with {c1, c2}. We need to check the pairings for the
+    // intermediate (twos) and leaf (ones) numbers.
+    
+    // Case 1: x1 is paired with c1, x2 with c2.
+    // Then we check both possibilities for pairing the 'ones'.
+    if (check(input_dominoes, c1, c2, x1, x2, o1, o2)) return true;
+    if (check(input_dominoes, c1, c2, x1, x2, o2, o1)) return true;
+
+    // Case 2: x2 is paired with c1, x1 with c2.
+    // Again, check both possibilities for pairing the 'ones'.
+    if (check(input_dominoes, c1, c2, x2, x1, o1, o2)) return true;
+    if (check(input_dominoes, c1, c2, x2, x1, o2, o1)) return true;
+
+    // If none of the valid configurations match the input, it's not possible.
+    return false;
+}
 
 
 int main(){
